@@ -42,3 +42,15 @@ chief status
 # Output raw JSON for script piping
 chief ask "Explain Byzantine fault tolerance" --json
 ```
+
+## Protected endpoints
+
+Set `CHIEF_COUNCIL_TOKEN` to the inference service token and `CHIEF_MODAL_KEY` /
+`CHIEF_MODAL_SECRET` to a Modal Proxy Token pair. Keep these in your environment or
+secret manager, never in source or command arguments. HTTPS is required except for
+loopback test servers. There is no implicit unauthenticated production fallback.
+A coordinator health response confirms liveness only; it does not test GPU seats.
+JSON and human output both exit nonzero on application failures. Missing agreement
+is reported as unknown, not an invented confidence percentage.
+
+Run isolated CLI regressions with `npm run test:project10` (no external services).

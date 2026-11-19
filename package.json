@@ -1,7 +1,7 @@
 {
   "name": "chief-cli",
   "version": "1.0.0",
-  "description": "Chief AI — Council of Four STEM Deliberation CLI",
+  "description": "Chief AI \u2014 Council of Four STEM Deliberation CLI",
   "main": "bin/chief.js",
   "bin": {
     "chief": "./bin/chief.js"
@@ -17,5 +17,8 @@
     "modal"
   ],
   "author": "Ruslan Polyak",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "test:project10": "node --test tests/*.test.cjs"
+  }
 }
