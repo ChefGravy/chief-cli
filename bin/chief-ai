@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+env_file="/home/chief-ai/apps/perplexica/.env"
+
+if [[ ! -r "$env_file" ]]; then
+    printf 'chief-ai: cannot read %s\n' "$env_file" >&2
+    exit 1
+fi
+
+set -a
+# shellcheck disable=SC1090
+. "$env_file"
+set +a
+
+: "${INFERENCE_API_TOKEN:?chief-ai: INFERENCE_API_TOKEN is missing}"
+: "${MODAL_PROXY_KEY:?chief-ai: MODAL_PROXY_KEY is missing}"
+: "${MODAL_PROXY_SECRET:?chief-ai: MODAL_PROXY_SECRET is missing}"
+
+export CHIEF_COUNCIL_TOKEN="${CHIEF_COUNCIL_TOKEN:-$INFERENCE_API_TOKEN}"
+export CHIEF_MODAL_KEY="${CHIEF_MODAL_KEY:-$MODAL_PROXY_KEY}"
+export CHIEF_MODAL_SECRET="${CHIEF_MODAL_SECRET:-$MODAL_PROXY_SECRET}"
+
+exec /home/chief-ai/.local/bin/chief "$@"
