@@ -22,10 +22,19 @@
 const https = require('node:https');
 const http = require('node:http');
 
-const VERSION = '1.0.0';
-const COORDINATOR_URL =
-    process.env.CHIEF_COUNCIL_URL ||
-    'https://chefgravy--chief-council-councilcoordinator-serve.us-east.modal.run';
+const VERSION = '1.1.0';
+const COORDINATOR_URL = process.env.CHIEF_COUNCIL_URL;
+const OLLAMA_URL =
+    process.env.CHIEF_OLLAMA_URL ||
+    process.env.OLLAMA_BASE_URL ||
+    'http://127.0.0.1:11434';
+const LOCAL_MODELS = {
+    qwen: { key: 'qwen2.5:7b', name: 'Qwen 2.5 7B Instruct' },
+    finllm: {
+        key: 'ruslan-fin-llm-local:latest',
+        name: 'Ruslan FinLLM',
+    },
+};
 
 const ANSI = {
     reset: '\x1b[0m',
@@ -52,7 +61,7 @@ function printBanner() {
         `\n${ANSI.bold}${ANSI.cyan}🏛️  CHIEF AI — Council of Four STEM Ensemble CLI${ANSI.reset} ${ANSI.gray}v${VERSION}${ANSI.reset}`,
     );
     console.log(
-        `${ANSI.gray}   Option B Serverless Micro-Endpoints (Modal GPU) • Workflow 1 Parallel Ballot${ANSI.reset}\n`,
+        `${ANSI.gray}   VPS Ollama inference • one model loaded at a time${ANSI.reset}\n`,
     );
 }
 
@@ -71,7 +80,10 @@ function printHelp() {
         `  ${ANSI.cyan}council${ANSI.reset}               Display Council seats, model families, and specializations`,
     );
     console.log(
-        `  ${ANSI.cyan}status${ANSI.reset}                Ping Council infrastructure and measure response latency`,
+        `  ${ANSI.cyan}models${ANSI.reset}                List locally available models`,
+    );
+    console.log(
+        `  ${ANSI.cyan}status${ANSI.reset}                Check local Ollama availability`,
     );
     console.log(
         `  ${ANSI.cyan}help, --help, -h${ANSI.reset}      Show this help documentation`,
@@ -81,7 +93,10 @@ function printHelp() {
     );
     console.log(`${ANSI.bold}OPTIONS:${ANSI.reset}`);
     console.log(
-        `  ${ANSI.yellow}--seat <name>${ANSI.reset}         Direct query to a specific seat: ${ANSI.italic}deepseek, qwen, mistral, llama${ANSI.reset}`,
+        `  ${ANSI.yellow}--model <name>${ANSI.reset}        Select a model: ${ANSI.italic}qwen, finllm${ANSI.reset}`,
+    );
+    console.log(
+        `  ${ANSI.yellow}--seat <name>${ANSI.reset}         Compatibility alias for --model qwen or --model finllm`,
     );
     console.log(
         `  ${ANSI.yellow}--verbose${ANSI.reset}             Display individual specialist drafts alongside final synthesis`,
@@ -100,9 +115,9 @@ function printHelp() {
         `  chief ask "Derive Black-Scholes PDE boundary conditions" --seat qwen`,
     );
     console.log(
-        `  chief ask "Design a modern responsive navbar with Tailwind" --seat mistral`,
+        `  chief ask "Analyze this financial statement" --model finllm`,
     );
-    console.log(`  chief status\n`);
+    console.log(`  chief models\n`);
 }
 
 function requestJson(urlStr, options = {}, postData = null) {
@@ -208,6 +223,40 @@ function requestJson(urlStr, options = {}, postData = null) {
 }
 
 async function handleStatus() {
+    if (!COORDINATOR_URL) {
+        printBanner();
+        process.stdout.write(
+            `${ANSI.cyan}Checking local Ollama...${ANSI.reset} `,
+        );
+        const start = Date.now();
+        try {
+            const res = await requestJson(`${OLLAMA_URL}/api/tags`, {
+                timeout: 15000,
+            });
+            const models = (res.models || []).filter((model) =>
+                Object.values(LOCAL_MODELS).some(
+                    (available) => available.key === model.name,
+                ),
+            );
+            if (!models.length) {
+                throw new Error('No supported local models are installed');
+            }
+            console.log(
+                `${ANSI.green}AVAILABLE (${Date.now() - start}ms)${ANSI.reset}\n`,
+            );
+            for (const model of models) {
+                console.log(`  ${ANSI.cyan}•${ANSI.reset} ${model.name}`);
+            }
+            console.log(
+                `\n${ANSI.gray}Only one local model loads at a time.${ANSI.reset}\n`,
+            );
+        } catch (err) {
+            console.log(`${ANSI.red}UNAVAILABLE${ANSI.reset}`);
+            console.error(`\n${ANSI.red}Error:${ANSI.reset} ${err.message}\n`);
+            process.exitCode = 1;
+        }
+        return;
+    }
     printBanner();
     process.stdout.write(
         `${ANSI.cyan}⚡ Pinging Council of Four Coordinator...${ANSI.reset} `,
@@ -310,7 +359,82 @@ function handleCouncil() {
     );
 }
 
+function handleModels() {
+    printBanner();
+    console.log(`${ANSI.bold}AVAILABLE LOCAL MODELS:${ANSI.reset}\n`);
+    for (const [key, model] of Object.entries(LOCAL_MODELS)) {
+        console.log(
+            `  ${ANSI.cyan}• ${key}${ANSI.reset} ${ANSI.dim}->${ANSI.reset} ${model.name}`,
+        );
+    }
+    console.log(
+        `\n${ANSI.gray}Ollama unloads the previous model before loading the selected one.${ANSI.reset}\n`,
+    );
+}
+
+async function handleLocalAsk(prompt, options) {
+    if (!prompt || !prompt.trim()) {
+        console.error(
+            `${ANSI.red}Error:${ANSI.reset} Please provide a prompt. Example: chief ask "How do I optimize this query?"`,
+        );
+        process.exit(1);
+    }
+
+    const model = LOCAL_MODELS[options.model || 'qwen'];
+    if (!model) {
+        console.error(
+            `${ANSI.red}Error:${ANSI.reset} Unknown model. Available models: ${Object.keys(LOCAL_MODELS).join(', ')}`,
+        );
+        process.exit(1);
+    }
+
+    try {
+        const result = await requestJson(
+            `${OLLAMA_URL}/api/chat`,
+            { timeout: 180000 },
+            {
+                model: model.key,
+                messages: [{ role: 'user', content: prompt }],
+                stream: false,
+                keep_alive: 0,
+                options: { num_predict: options.maxTokens },
+            },
+        );
+        const content = result.message?.content || result.response || '';
+        if (!content) throw new Error('Ollama returned an empty response');
+
+        if (options.json) {
+            console.log(
+                JSON.stringify(
+                    { ok: true, model: model.key, content },
+                    null,
+                    2,
+                ),
+            );
+            return;
+        }
+
+        printBanner();
+        console.log(
+            `${ANSI.bold}MODEL:${ANSI.reset} ${model.name}\n${ANSI.gray}${content}${ANSI.reset}\n`,
+        );
+    } catch (err) {
+        if (options.json) {
+            console.error(JSON.stringify({ ok: false, error: err.message }));
+        } else {
+            console.error(
+                `${ANSI.red}Local model request failed:${ANSI.reset} ${err.message}`,
+            );
+        }
+        process.exit(1);
+    }
+}
+
 async function handleAsk(prompt, options) {
+    if (!COORDINATOR_URL) {
+        await handleLocalAsk(prompt, options);
+        return;
+    }
     const endpoint = new URL(COORDINATOR_URL);
     const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(
         endpoint.hostname,
@@ -506,19 +630,25 @@ async function main() {
     }
 
     if (firstArg === 'council') {
-        handleCouncil();
+        handleModels();
+        return;
+    }
+
+    if (firstArg === 'models') {
+        handleModels();
         return;
     }
 
     // Parse options
     const options = {
         seat: null,
+        model: null,
         verbose: false,
         json: false,
         maxTokens: 450,
     };
 
-    const ALLOWED_SEATS = ['deepseek', 'qwen', 'mistral', 'llama'];
+    const ALLOWED_MODELS = Object.keys(LOCAL_MODELS);
     let promptWords = [];
     let i = 0;
     if (firstArg === 'ask') i = 1;
@@ -529,17 +659,28 @@ async function main() {
             const nextVal = args[i + 1]?.toLowerCase();
             if (!nextVal || nextVal.startsWith('--')) {
                 console.error(
-                    `${ANSI.red}Error:${ANSI.reset} --seat requires a valid seat (${ALLOWED_SEATS.join(', ')})`,
+                    `${ANSI.red}Error:${ANSI.reset} --seat requires a valid model (${ALLOWED_MODELS.join(', ')})`,
                 );
                 process.exit(1);
             }
-            if (!ALLOWED_SEATS.includes(nextVal)) {
+            if (!ALLOWED_MODELS.includes(nextVal)) {
                 console.error(
-                    `${ANSI.red}Error:${ANSI.reset} Unknown seat '${nextVal}'. Allowed seats: ${ALLOWED_SEATS.join(', ')}`,
+                    `${ANSI.red}Error:${ANSI.reset} Unknown model '${nextVal}'. Allowed models: ${ALLOWED_MODELS.join(', ')}`,
                 );
                 process.exit(1);
             }
             options.seat = nextVal;
+            options.model = nextVal;
+            i += 2;
+        } else if (arg === '--model') {
+            const nextVal = args[i + 1]?.toLowerCase();
+            if (!nextVal || !ALLOWED_MODELS.includes(nextVal)) {
+                console.error(
+                    `${ANSI.red}Error:${ANSI.reset} --model requires one of: ${ALLOWED_MODELS.join(', ')}`,
+                );
+                process.exit(1);
+            }
+            options.model = nextVal;
             i += 2;
         } else if (arg === '--verbose' || arg === '-V') {
             options.verbose = true;

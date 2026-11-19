@@ -1,16 +1,12 @@
-# Chief AI — Council of Four STEM CLI
+# Chief AI — Local Ollama CLI
 
-Standalone developer CLI for the Council of Four neural cross-auditing ensemble.
+Standalone developer CLI for the VPS Ollama models. Ollama unloads the current model before loading the selected model.
 
-## Seats & Model Families
-1. **DeepSeek (7B):** Forensic Logic, Algorithms, Code Architecture & Systems.
-2. **Qwen (7B):** Mathematics, Quantitative Reasoning, Calculations & Science.
-3. **Mistral (7B):** Structure, Schema Validation & Frontend UI/UX Design.
-4. **Llama (8B):** Chief Arbiter, STEM Synthesis & Balance.
+## Available Models
+1. **Qwen 2.5 7B Instruct:** `--model qwen`
+2. **Ruslan FinLLM:** `--model finllm`
 
-## Architecture & Workflow
-- **Architecture:** Option B — 4 isolated serverless micro-endpoints on Modal GPU (`Tesla T4`, $0 when idle).
-- **Deliberation:** Workflow 1 — Parallel Blind Ballot with consensus agreement confidence scoring (0–100%).
+The old Council endpoint remains available only when `CHIEF_COUNCIL_URL` is explicitly configured.
 
 ## Installation
 The binary is installed globally on the system:
@@ -22,23 +18,24 @@ which chief
 
 ## Commands
 ```bash
-# Run a full Council of Four parallel deliberation
+# Ask the default Qwen model
 chief "Design a distributed rate limiter in Redis with sliding windows"
 
-# Shorthand or explicit ask
-chief ask "Derive the Black-Scholes PDE boundary conditions"
+# Select FinLLM
+chief ask "Analyze this financial statement" --model finllm
 
-# Query a specific specialist directly
-chief ask "Design a dark mode Bento Grid with Tailwind CSS" --seat mistral
-chief ask "Audit the time complexity of quickselect vs heapsort" --seat deepseek
-chief ask "Calculate Sloan accruals ratio from balance sheet line items" --seat qwen
+# Compatibility alias
+chief ask "Calculate Sloan accruals ratio" --seat finllm
 
-# Inspect Council roster and model families
+# List local models
+chief models
 chief council
 
-# Check health and response latency
+# Check Ollama health
 chief status
 
 # Output raw JSON for script piping
 chief ask "Explain Byzantine fault tolerance" --json
 ```
+
+Use `CHIEF_OLLAMA_URL` to point the CLI at another Ollama server.

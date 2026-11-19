@@ -81,3 +81,21 @@ test('public endpoint requires HTTPS and explicit token', async () => {
     assert.equal(r.code, 1);
     assert.match(r.err, /CHIEF_COUNCIL_TOKEN/);
 });
+
+test('local Ollama mode selects an available model', () =>
+    withServer(
+        { message: { content: 'local fixture' } },
+        async (url, requests) => {
+            const r = await run(
+                url,
+                ['ask', 'fixture', '--model', 'qwen', '--json'],
+                {
+                    CHIEF_COUNCIL_URL: '',
+                    CHIEF_OLLAMA_URL: url,
+                },
+            );
+            assert.equal(r.code, 0);
+            assert.equal(JSON.parse(r.out).content, 'local fixture');
+            assert.match(requests[0].body, /qwen2\.5:7b/);
+        },
+    ));
