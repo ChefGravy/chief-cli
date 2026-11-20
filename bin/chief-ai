@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-export CHIEF_OLLAMA_URL="${CHIEF_OLLAMA_URL:-http://127.0.0.1:11434}"
-
-exec /home/chief-ai/.local/bin/chief "$@"
