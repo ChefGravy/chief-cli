@@ -125,6 +125,10 @@ function requestJson(urlStr, options = {}, postData = null) {
         const url = new URL(urlStr);
         const isHttps = url.protocol === 'https:';
         const client = isHttps ? https : http;
+        const coordinatorOrigin = COORDINATOR_URL
+            ? new URL(COORDINATOR_URL).origin
+            : null;
+        const isCoordinator = coordinatorOrigin === url.origin;
 
         const reqOptions = {
             hostname: url.hostname,
@@ -134,13 +138,13 @@ function requestJson(urlStr, options = {}, postData = null) {
             headers: {
                 'Content-Type': 'application/json',
                 'User-Agent': `Chief-CLI/${VERSION}`,
-                ...(process.env.CHIEF_MODAL_KEY
+                ...(isCoordinator && process.env.CHIEF_MODAL_KEY
                     ? {
                           'Modal-Key': process.env.CHIEF_MODAL_KEY,
                           'Modal-Secret': process.env.CHIEF_MODAL_SECRET || '',
                       }
                     : {}),
-                ...(process.env.CHIEF_COUNCIL_TOKEN
+                ...(isCoordinator && process.env.CHIEF_COUNCIL_TOKEN
                     ? {
                           Authorization: `Bearer ${process.env.CHIEF_COUNCIL_TOKEN}`,
                       }
